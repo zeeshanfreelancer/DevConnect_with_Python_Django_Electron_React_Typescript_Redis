@@ -1,5 +1,6 @@
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react';
+import { checkBackendHealth } from "./services/api";
 import {
   Activity,
   Bell,
@@ -197,8 +198,32 @@ function App() {
     setDraft('')
   }
 
+const [backendStatus, setBackendStatus] = useState("Checking...");
+const [backendMessage, setBackendMessage] = useState("");
+
+useEffect(() => {
+  checkBackendHealth()
+    .then((data) => {
+      setBackendStatus("Connected");
+      setBackendMessage(data.message);
+    })
+    .catch((error) => {
+      console.error("Backend connection error:", error);
+      setBackendStatus("Disconnected");
+      setBackendMessage("Unable to connect to Django backend.");
+    });
+}, []);
+
   return (
     <div className="flex h-screen overflow-hidden bg-white text-slate-800">
+      <div className="fixed bottom-4 right-4 z-50 rounded-lg bg-white p-3 shadow-lg">
+  <p className="font-semibold">
+    Backend: {backendStatus}
+  </p>
+  <p className="text-sm text-gray-500">
+    {backendMessage}
+  </p>
+</div>
       {/* Main navigation */}
       <aside className="flex w-[72px] shrink-0 flex-col items-center bg-[#f5f5f5] py-5">
         <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-sm">
