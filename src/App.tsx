@@ -1,6 +1,10 @@
 
 import { useMemo, useState, useEffect } from 'react';
-import { checkBackendHealth } from "./services/api";
+import {
+  checkBackendHealth,
+  getConversations,
+  createConversation,
+} from "./services/api";
 import {
   Activity,
   Bell,
@@ -44,101 +48,6 @@ type Conversation = {
   messages: Message[]
 }
 
-const initialConversations: Conversation[] = [
-  {
-    id: 1,
-    name: 'Sarah Johnson',
-    initials: 'SJ',
-    color: 'bg-violet-500',
-    preview: 'I have shared the latest updates.',
-    time: '10:42 AM',
-    unread: 2,
-    online: true,
-    messages: [
-      {
-        id: 1,
-        sender: 'Sarah Johnson',
-        text: 'Hey! How is the new dashboard coming along?',
-        time: '10:38 AM',
-      },
-      {
-        id: 2,
-        sender: 'You',
-        text: 'Pretty well! I have finished the main layout and navigation.',
-        time: '10:40 AM',
-        mine: true,
-      },
-      {
-        id: 3,
-        sender: 'Sarah Johnson',
-        text: 'That sounds great. I have shared the latest updates.',
-        time: '10:42 AM',
-      },
-    ],
-  },
-  {
-    id: 2,
-    name: 'Development Team',
-    initials: 'DT',
-    color: 'bg-blue-500',
-    preview: 'Alex: The API is ready for testing.',
-    time: '10:30 AM',
-    unread: 0,
-    online: true,
-    messages: [
-      {
-        id: 1,
-        sender: 'Alex Morgan',
-        text: 'The API is ready for testing.',
-        time: '10:30 AM',
-      },
-      {
-        id: 2,
-        sender: 'You',
-        text: 'Great! I will check the integration today.',
-        time: '10:32 AM',
-        mine: true,
-      },
-    ],
-  },
-  {
-    id: 3,
-    name: 'Alex Morgan',
-    initials: 'AM',
-    color: 'bg-emerald-500',
-    preview: 'Can we review the pull request?',
-    time: 'Yesterday',
-    unread: 0,
-    online: false,
-    messages: [
-      {
-        id: 1,
-        sender: 'Alex Morgan',
-        text: 'Can we review the pull request?',
-        time: 'Yesterday',
-      },
-    ],
-  },
-  {
-    id: 4,
-    name: 'Project Planning',
-    initials: 'PP',
-    color: 'bg-amber-500',
-    preview: 'Meeting scheduled for tomorrow.',
-    time: 'Yesterday',
-    unread: 0,
-    online: false,
-    messages: [
-      {
-        id: 1,
-        sender: 'Project Planning',
-        text: 'Meeting scheduled for tomorrow.',
-        time: 'Yesterday',
-      },
-    ],
-  },
-]
-
 const navItems = [
   { label: 'Activity', icon: Activity },
   { label: 'Chat', icon: MessageSquare },
@@ -148,8 +57,10 @@ const navItems = [
 ]
 
 function App() {
-  const [conversations, setConversations] = useState(initialConversations)
-  const [activeId, setActiveId] = useState(1)
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [loadingConversations, setLoadingConversations] = useState(true);
+  const [conversationError, setConversationError] = useState("");
   const [activeNav, setActiveNav] = useState('Chat')
   const [search, setSearch] = useState('')
   const [draft, setDraft] = useState('')
@@ -157,6 +68,98 @@ function App() {
   const activeConversation = conversations.find(
     (conversation) => conversation.id === activeId,
   )
+
+  async function loadConversations() {
+    try {
+      setLoadingConversations(true);
+      setConversationError("");
+
+      const data = await getConversations();
+
+      const colors = [
+        "bg-violet-500",
+        "bg-blue-500",
+        "bg-emerald-500",
+        "bg-amber-500",
+      ];
+
+      const formattedConversations: Conversation[] = data.map(
+        (conversation, index) => ({
+          id: conversation.id,
+          name: conversation.title,
+          initials: conversation.title
+            .split(" ")
+            .map((word) => word[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase(),
+          color: colors[index % colors.length],
+          preview: conversation.last_message || "No messages yet",
+          time: new Date(conversation.updated_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          unread: 0,
+          online: false,
+          messages: [],
+        })
+      );
+
+      setConversations(formattedConversations);
+
+      setActiveId((currentId) => {
+        if (
+          currentId !== null &&
+          formattedConversations.some((item) => item.id === currentId)
+        ) {
+          return currentId;
+        }
+
+        return formattedConversations[0]?.id ?? null;
+      });
+    } catch (error) {
+      console.error("Conversation loading error:", error);
+      setConversationError("Unable to load conversations.");
+    } finally {
+      setLoadingConversations(false);
+    }
+  }
+
+  async function handleCreateConversation() {
+    const title = window.prompt("Enter conversation name:");
+
+    if (!title?.trim()) return;
+
+    try {
+      const created = await createConversation(title.trim());
+
+      const newConversation: Conversation = {
+        id: created.id,
+        name: created.title,
+        initials: created.title
+          .split(" ")
+          .map((word) => word[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase(),
+        color: "bg-violet-500",
+        preview: created.last_message || "No messages yet",
+        time: new Date(created.updated_at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        unread: 0,
+        online: false,
+        messages: [],
+      };
+
+      setConversations((current) => [newConversation, ...current]);
+      setActiveId(created.id);
+    } catch (error) {
+      console.error("Create conversation error:", error);
+      alert("Unable to create conversation.");
+    }
+  }
 
   const filteredConversations = useMemo(
     () =>
@@ -186,11 +189,11 @@ function App() {
       current.map((conversation) =>
         conversation.id === activeId
           ? {
-              ...conversation,
-              preview: text,
-              time: newMessage.time,
-              messages: [...conversation.messages, newMessage],
-            }
+            ...conversation,
+            preview: text,
+            time: newMessage.time,
+            messages: [...conversation.messages, newMessage],
+          }
           : conversation,
       ),
     )
@@ -198,32 +201,36 @@ function App() {
     setDraft('')
   }
 
-const [backendStatus, setBackendStatus] = useState("Checking...");
-const [backendMessage, setBackendMessage] = useState("");
+  const [backendStatus, setBackendStatus] = useState("Checking...");
+  const [backendMessage, setBackendMessage] = useState("");
 
-useEffect(() => {
-  checkBackendHealth()
-    .then((data) => {
-      setBackendStatus("Connected");
-      setBackendMessage(data.message);
-    })
-    .catch((error) => {
-      console.error("Backend connection error:", error);
-      setBackendStatus("Disconnected");
-      setBackendMessage("Unable to connect to Django backend.");
-    });
-}, []);
+  useEffect(() => {
+    checkBackendHealth()
+      .then((data) => {
+        setBackendStatus("Connected");
+        setBackendMessage(data.message);
+      })
+      .catch((error) => {
+        console.error("Backend connection error:", error);
+        setBackendStatus("Disconnected");
+        setBackendMessage("Unable to connect to Django backend.");
+      });
+  }, []);
+
+  useEffect(() => {
+    loadConversations();
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden bg-white text-slate-800">
       <div className="fixed bottom-4 right-4 z-50 rounded-lg bg-white p-3 shadow-lg">
-  <p className="font-semibold">
-    Backend: {backendStatus}
-  </p>
-  <p className="text-sm text-gray-500">
-    {backendMessage}
-  </p>
-</div>
+        <p className="font-semibold">
+          Backend: {backendStatus}
+        </p>
+        <p className="text-sm text-gray-500">
+          {backendMessage}
+        </p>
+      </div>
       {/* Main navigation */}
       <aside className="flex w-[72px] shrink-0 flex-col items-center bg-[#f5f5f5] py-5">
         <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-sm">
@@ -236,11 +243,10 @@ useEffect(() => {
               key={label}
               onClick={() => setActiveNav(label)}
               title={label}
-              className={`relative flex h-12 w-14 flex-col items-center justify-center gap-1 rounded-xl transition ${
-                activeNav === label
-                  ? 'bg-white text-violet-700 shadow-sm'
-                  : 'text-slate-500 hover:bg-white hover:text-slate-800'
-              }`}
+              className={`relative flex h-12 w-14 flex-col items-center justify-center gap-1 rounded-xl transition ${activeNav === label
+                ? 'bg-white text-violet-700 shadow-sm'
+                : 'text-slate-500 hover:bg-white hover:text-slate-800'
+                }`}
             >
               {activeNav === label && (
                 <span className="absolute left-0 h-7 w-1 rounded-r-full bg-violet-600" />
@@ -282,9 +288,7 @@ useEffect(() => {
           </div>
           <button
             title="New chat"
-            onClick={() =>
-              setSearch('')
-            }
+            onClick={handleCreateConversation}
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
           >
             <Plus size={19} />
@@ -316,15 +320,26 @@ useEffect(() => {
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 py-2">
+
+          {loadingConversations && (
+            <p className="px-4 py-8 text-center text-sm text-slate-400">
+              Loading conversations...
+            </p>
+          )}
+
+          {conversationError && (
+            <p className="px-4 py-8 text-center text-sm text-red-500">
+              {conversationError}
+            </p>
+          )}
           {filteredConversations.map((conversation) => (
             <button
               key={conversation.id}
               onClick={() => setActiveId(conversation.id)}
-              className={`mb-1 flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition ${
-                activeId === conversation.id
-                  ? 'bg-violet-50'
-                  : 'hover:bg-slate-50'
-              }`}
+              className={`mb-1 flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition ${activeId === conversation.id
+                ? 'bg-violet-50'
+                : 'hover:bg-slate-50'
+                }`}
             >
               <div className="relative shrink-0">
                 <div
@@ -397,11 +412,10 @@ useEffect(() => {
                   </h2>
                   <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
                     <span
-                      className={`h-2 w-2 rounded-full ${
-                        activeConversation.online
-                          ? 'bg-emerald-500'
-                          : 'bg-slate-300'
-                      }`}
+                      className={`h-2 w-2 rounded-full ${activeConversation.online
+                        ? 'bg-emerald-500'
+                        : 'bg-slate-300'
+                        }`}
                     />
                     {activeConversation.online ? 'Available' : 'Offline'}
                   </p>
@@ -448,9 +462,8 @@ useEffect(() => {
               {activeConversation.messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex items-end gap-2.5 ${
-                    message.mine ? 'justify-end' : 'justify-start'
-                  }`}
+                  className={`flex items-end gap-2.5 ${message.mine ? 'justify-end' : 'justify-start'
+                    }`}
                 >
                   {!message.mine && (
                     <div
@@ -461,9 +474,8 @@ useEffect(() => {
                   )}
 
                   <div
-                    className={`flex max-w-[75%] flex-col ${
-                      message.mine ? 'items-end' : 'items-start'
-                    }`}
+                    className={`flex max-w-[75%] flex-col ${message.mine ? 'items-end' : 'items-start'
+                      }`}
                   >
                     <div className="mb-1.5 flex items-center gap-2 text-[11px] text-slate-400">
                       <span className="font-medium text-slate-600">
@@ -472,11 +484,10 @@ useEffect(() => {
                       <span>{message.time}</span>
                     </div>
                     <div
-                      className={`rounded-2xl px-4 py-3 text-sm leading-6 ${
-                        message.mine
-                          ? 'rounded-br-md bg-violet-600 text-white'
-                          : 'rounded-bl-md bg-slate-100 text-slate-700'
-                      }`}
+                      className={`rounded-2xl px-4 py-3 text-sm leading-6 ${message.mine
+                        ? 'rounded-br-md bg-violet-600 text-white'
+                        : 'rounded-bl-md bg-slate-100 text-slate-700'
+                        }`}
                     >
                       {message.text}
                     </div>
