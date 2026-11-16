@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.http import JsonResponse
 
-from .models import Conversation
-from .serializers import ConversationSerializer
+from .models import Conversation, Message
+from .serializers import ConversationSerializer, MessageSerializer
 
 def health_check(request):
     return JsonResponse({
@@ -44,3 +44,63 @@ def conversations(request):
             serializer.errors,
             status=status.HTTP_400_BAD_REQUEST
         )
+
+@api_view(["GET", "POST"])
+def conversation_messages(request, conversation_id):
+
+    try:
+        conversation = Conversation.objects.get(id=conversation_id)
+
+    except Conversation.DoesNotExist:
+        return Response(
+            {"error": "Conversation not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # GET: Retrieve all messages
+    if request.method == "GET":
+
+        messages = conversation.messages.all()
+
+        serializer = MessageSerializer(messages, many=True)
+
+        return Response(serializer.data)
+
+    # POST: Create a new message
+    elif request.method == "POST":
+
+        serializer = MessageSerializer(data=request.data)
+
+        if serializer.is_valid():
+
+            message = serializer.save(conversation=conversation)
+
+            conversation.last_message = message.text
+            conversation.save()
+
+            return Response(
+                MessageSerializer(message).data,
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(["GET"])
+def message_detail(request, message_id):
+
+    try:
+        message = Message.objects.get(id=message_id)
+
+    except Message.DoesNotExist:
+        return Response(
+            {"error": "Message not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    serializer = MessageSerializer(message)
+
+    return Response(serializer.data)
