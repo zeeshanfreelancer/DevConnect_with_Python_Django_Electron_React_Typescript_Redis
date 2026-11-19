@@ -4,7 +4,10 @@ import {
   checkBackendHealth,
   getConversations,
   createConversation,
+  getMessages,
+  sendMessage as sendMessageApi,
 } from "./services/api";
+
 import {
   Activity,
   Bell,
@@ -61,6 +64,8 @@ function App() {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [conversationError, setConversationError] = useState("");
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState("");
   const [activeNav, setActiveNav] = useState('Chat')
   const [search, setSearch] = useState('')
   const [draft, setDraft] = useState('')
@@ -169,36 +174,47 @@ function App() {
     [conversations, search],
   )
 
-  function sendMessage() {
-    const text = draft.trim()
+  async function sendMessage() {
+    const text = draft.trim();
 
-    if (!text || !activeConversation) return
+    if (!text || !activeConversation) return;
 
-    const newMessage: Message = {
-      id: Date.now(),
-      sender: 'You',
-      text,
-      time: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      mine: true,
+    try {
+      const savedMessage = await sendMessageApi(
+        activeConversation.id,
+        "Zeeshan",
+        text
+      );
+
+      const newMessage: Message = {
+        id: savedMessage.id,
+        sender: savedMessage.sender,
+        text: savedMessage.text,
+        time: new Date(savedMessage.created_at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        mine: true,
+      };
+
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === activeId
+            ? {
+              ...conversation,
+              preview: text,
+              time: newMessage.time,
+              messages: [...conversation.messages, newMessage],
+            }
+            : conversation
+        )
+      );
+
+      setDraft("");
+    } catch (error) {
+      console.error("Send message error:", error);
+      alert("Message could not be sent. Please try again.");
     }
-
-    setConversations((current) =>
-      current.map((conversation) =>
-        conversation.id === activeId
-          ? {
-            ...conversation,
-            preview: text,
-            time: newMessage.time,
-            messages: [...conversation.messages, newMessage],
-          }
-          : conversation,
-      ),
-    )
-
-    setDraft('')
   }
 
   const [backendStatus, setBackendStatus] = useState("Checking...");
@@ -220,6 +236,58 @@ function App() {
   useEffect(() => {
     loadConversations();
   }, []);
+
+  useEffect(() => {
+    if (activeId === null) return;
+
+    let cancelled = false;
+
+    async function loadMessages() {
+      try {
+        setMessagesLoading(true);
+        setMessagesError("");
+
+        const data = await getMessages(activeId!);
+
+        if (cancelled) return;
+
+        const formattedMessages: Message[] = data.map((message) => ({
+          id: message.id,
+          sender: message.sender,
+          text: message.text,
+          time: new Date(message.created_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          mine: message.sender === "Zeeshan",
+        }));
+
+        setConversations((current) =>
+          current.map((conversation) =>
+            conversation.id === activeId
+              ? { ...conversation, messages: formattedMessages }
+              : conversation
+          )
+        );
+      } catch (error) {
+        console.error("Message loading error:", error);
+
+        if (!cancelled) {
+          setMessagesError("Unable to load messages.");
+        }
+      } finally {
+        if (!cancelled) {
+          setMessagesLoading(false);
+        }
+      }
+    }
+
+    loadMessages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeId]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-white text-slate-800">
@@ -458,6 +526,18 @@ function App() {
                 </span>
                 <div className="h-px flex-1 bg-slate-100" />
               </div>
+
+              {messagesLoading && (
+                <p className="text-center text-sm text-slate-400">
+                  Loading messages...
+                </p>
+              )}
+
+              {messagesError && (
+                <p className="text-center text-sm text-red-500">
+                  {messagesError}
+                </p>
+              )}
 
               {activeConversation.messages.map((message) => (
                 <div

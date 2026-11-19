@@ -15,6 +15,14 @@ export interface BackendConversation {
   updated_at: string;
 }
 
+export interface BackendMessage {
+  id: number;
+  conversation: number;
+  sender: string;
+  text: string;
+  created_at: string;
+}
+
 export async function checkBackendHealth(): Promise<HealthResponse> {
   const response = await fetch(`${API_BASE_URL}/health/`);
 
@@ -49,6 +57,43 @@ export async function createConversation(
 
   if (!response.ok) {
     throw new Error("Failed to create conversation");
+  }
+
+  return response.json();
+}
+
+export async function getMessages(
+  conversationId: number
+): Promise<BackendMessage[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/conversations/${conversationId}/messages/`
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch messages");
+  }
+
+  return response.json();
+}
+
+export async function sendMessage(
+  conversationId: number,
+  sender: string,
+  text: string
+): Promise<BackendMessage> {
+  const response = await fetch(
+    `${API_BASE_URL}/conversations/${conversationId}/messages/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ sender, text }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to send message");
   }
 
   return response.json();
