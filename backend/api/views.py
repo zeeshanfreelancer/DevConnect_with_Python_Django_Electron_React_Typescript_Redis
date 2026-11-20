@@ -3,6 +3,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.http import JsonResponse
 
+from django.contrib.auth.models import User
+from rest_framework.authtoken.models import Token
+from .auth_serializers import RegisterSerializer
+
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 
@@ -104,3 +108,33 @@ def message_detail(request, message_id):
     serializer = MessageSerializer(message)
 
     return Response(serializer.data)
+
+@api_view(["POST"])
+def register(request):
+
+    serializer = RegisterSerializer(data=request.data)
+
+    if serializer.is_valid():
+        user = serializer.save()
+
+        token, created = Token.objects.get_or_create(
+            user=user
+        )
+
+        return Response({
+            "success": True,
+            "message": "Account created successfully.",
+            "token": token.key,
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+            }
+        }, status=status.HTTP_201_CREATED)
+
+    return Response(
+        serializer.errors,
+        status=status.HTTP_400_BAD_REQUEST
+    )

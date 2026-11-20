@@ -5,10 +5,12 @@ from .views import (
     conversations,
     conversation_messages,
     message_detail,
+    register,
 )
 
 urlpatterns = [
     path("health/", health_check, name="health_check"),
+    path("register/", register, name="register"),
 
     path("conversations/", conversations, name="conversations"),
 
