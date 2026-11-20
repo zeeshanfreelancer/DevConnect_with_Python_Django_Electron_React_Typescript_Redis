@@ -7,6 +7,8 @@ from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 from .auth_serializers import RegisterSerializer
 
+from django.contrib.auth import authenticate
+
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 
@@ -138,3 +140,42 @@ def register(request):
         serializer.errors,
         status=status.HTTP_400_BAD_REQUEST
     )
+
+@api_view(["POST"])
+def login(request):
+
+    username = request.data.get("username")
+    password = request.data.get("password")
+
+    if not username or not password:
+        return Response(
+            {"error": "Username and password are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    user = authenticate(
+        request,
+        username=username,
+        password=password
+    )
+
+    if user is None:
+        return Response(
+            {"error": "Invalid username or password."},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    token, created = Token.objects.get_or_create(user=user)
+
+    return Response({
+        "success": True,
+        "message": "Login successful.",
+        "token": token.key,
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+        }
+    }, status=status.HTTP_200_OK)
