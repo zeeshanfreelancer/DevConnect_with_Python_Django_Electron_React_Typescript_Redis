@@ -1,4 +1,3 @@
-from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import JsonResponse
@@ -8,6 +7,11 @@ from rest_framework.authtoken.models import Token
 from .auth_serializers import RegisterSerializer
 
 from django.contrib.auth import authenticate
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import (
+    api_view,
+    permission_classes
+)
 
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
@@ -171,6 +175,34 @@ def login(request):
         "success": True,
         "message": "Login successful.",
         "token": token.key,
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+        }
+    }, status=status.HTTP_200_OK)   
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def logout(request):
+
+    request.user.auth_token.delete()
+
+    return Response({
+        "success": True,
+        "message": "Logout successful."
+    }, status=status.HTTP_200_OK)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def profile(request):
+
+    user = request.user
+
+    return Response({
+        "success": True,
         "user": {
             "id": user.id,
             "username": user.username,
