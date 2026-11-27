@@ -64,7 +64,10 @@ def conversations(request):
 def conversation_messages(request, conversation_id):
 
     try:
-        conversation = Conversation.objects.get(id=conversation_id)
+        conversation = Conversation.objects.get(
+            id=conversation_id,
+            members=request.user
+        )
 
     except Conversation.DoesNotExist:
         return Response(
@@ -72,7 +75,6 @@ def conversation_messages(request, conversation_id):
             status=status.HTTP_404_NOT_FOUND
         )
 
-    # GET: Retrieve all messages
     if request.method == "GET":
 
         messages = conversation.messages.all()
@@ -81,14 +83,16 @@ def conversation_messages(request, conversation_id):
 
         return Response(serializer.data)
 
-    # POST: Create a new message
     elif request.method == "POST":
 
         serializer = MessageSerializer(data=request.data)
 
         if serializer.is_valid():
 
-            message = serializer.save(conversation=conversation)
+            message = serializer.save(
+                conversation=conversation,
+                sender=request.user.username
+            )
 
             conversation.last_message = message.text
             conversation.save()
@@ -109,7 +113,10 @@ def conversation_messages(request, conversation_id):
 def message_detail(request, message_id):
 
     try:
-        message = Message.objects.get(id=message_id)
+        message = Message.objects.get(
+            id=message_id,
+            conversation__members=request.user
+        )
 
     except Message.DoesNotExist:
         return Response(
@@ -215,5 +222,57 @@ def profile(request):
             "email": user.email,
             "first_name": user.first_name,
             "last_name": user.last_name,
+        }
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def add_conversation_member(request, conversation_id):
+
+    try:
+        conversation = Conversation.objects.get(
+            id=conversation_id,
+            members=request.user
+        )
+
+    except Conversation.DoesNotExist:
+        return Response(
+            {"error": "Conversation not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    username = request.data.get("username")
+
+    if not username:
+        return Response(
+            {"error": "Username is required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        user = User.objects.get(username=username)
+
+    except User.DoesNotExist:
+        return Response(
+            {"error": "User not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    if conversation.members.filter(id=user.id).exists():
+        return Response(
+            {"error": "User is already a member."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    conversation.members.add(user)
+
+    return Response({
+        "success": True,
+        "message": f"{username} added to conversation.",
+        "conversation_id": conversation.id,
+        "member": {
+            "id": user.id,
+            "username": user.username
         }
     }, status=status.HTTP_200_OK)

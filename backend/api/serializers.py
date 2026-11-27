@@ -24,6 +24,9 @@ class MessageSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
-        # The conversation is selected by the URL and assigned by the view.
-        # Clients should only provide the message content.
-        read_only_fields = ["id", "conversation", "created_at"]
+        read_only_fields = [
+            "id",
+            "conversation",
+            "sender",
+            "created_at",
+        ]

@@ -1,6 +1,5 @@
 from django.urls import path
 
-from .views import logout, profile
 from .views import (
     health_check,
     conversations,
@@ -8,6 +7,9 @@ from .views import (
     message_detail,
     register,
     login,
+    add_conversation_member,
+    profile,
+    logout,
 )
 
 urlpatterns = [
@@ -29,5 +31,11 @@ urlpatterns = [
         "messages/<int:message_id>/",
         message_detail,
         name="message_detail"
+    ),
+
+    path(
+        "conversations/<int:conversation_id>/members/",
+        add_conversation_member,
+        name="add_conversation_member"
     ),
 ]
