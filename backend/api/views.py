@@ -25,28 +25,32 @@ def health_check(request):
 
 
 @api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
 def conversations(request):
 
-    # Get all conversations
     if request.method == "GET":
 
-        data = Conversation.objects.all().order_by("-updated_at")
+        data = Conversation.objects.filter(
+            members=request.user
+        ).distinct().order_by("-updated_at")
 
         serializer = ConversationSerializer(data, many=True)
 
         return Response(serializer.data)
 
-    # Create a conversation
     elif request.method == "POST":
 
         serializer = ConversationSerializer(data=request.data)
 
         if serializer.is_valid():
 
-            serializer.save()
+            conversation = serializer.save()
+
+            # Automatically add the logged-in user
+            conversation.members.add(request.user)
 
             return Response(
-                serializer.data,
+                ConversationSerializer(conversation).data,
                 status=status.HTTP_201_CREATED
             )
 
@@ -56,6 +60,7 @@ def conversations(request):
         )
 
 @api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
 def conversation_messages(request, conversation_id):
 
     try:
@@ -100,6 +105,7 @@ def conversation_messages(request, conversation_id):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def message_detail(request, message_id):
 
     try:

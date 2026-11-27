@@ -1,7 +1,17 @@
 from django.db import models
+from django.contrib.auth.models import User
+
+
 class Conversation(models.Model):
     title = models.CharField(max_length=255)
+
+    members = models.ManyToManyField(
+        User,
+        related_name="conversations"
+    )
+
     last_message = models.TextField(blank=True, default="")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
