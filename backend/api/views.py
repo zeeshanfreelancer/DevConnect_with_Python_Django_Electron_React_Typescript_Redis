@@ -350,3 +350,78 @@ def remove_conversation_member(request, conversation_id, user_id):
         "conversation_id": conversation.id,
         "removed_user_id": user_to_remove.id
     }, status=status.HTTP_200_OK)
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def update_conversation(request, conversation_id):
+
+    try:
+        conversation = Conversation.objects.get(
+            id=conversation_id,
+            members=request.user
+        )
+
+    except Conversation.DoesNotExist:
+        return Response(
+            {"error": "Conversation not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Only the creator can update the conversation
+    if conversation.created_by != request.user:
+        return Response(
+            {"error": "Only the conversation creator can update it."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    title = request.data.get("title")
+
+    if not isinstance(title, str) or not title.strip():
+        return Response(
+            {"error": "A valid conversation title is required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    conversation.title = title.strip()
+    conversation.save()
+
+    return Response({
+        "success": True,
+        "message": "Conversation updated successfully.",
+        "conversation": {
+            "id": conversation.id,
+            "title": conversation.title,
+            "last_message": conversation.last_message,
+            "updated_at": conversation.updated_at
+        }
+    }, status=status.HTTP_200_OK)
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_conversation(request, conversation_id):
+
+    try:
+        conversation = Conversation.objects.get(
+            id=conversation_id,
+            members=request.user
+        )
+
+    except Conversation.DoesNotExist:
+        return Response(
+            {"error": "Conversation not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Only creator can delete the conversation
+    if conversation.created_by != request.user:
+        return Response(
+            {"error": "Only the conversation creator can delete it."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    conversation.delete()
+
+    return Response({
+        "success": True,
+        "message": "Conversation deleted successfully."
+    }, status=status.HTTP_200_OK)

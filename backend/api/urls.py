@@ -10,7 +10,9 @@ from .views import (
     profile,
     logout,
     conversation_members,
-    remove_conversation_member
+    remove_conversation_member,
+    update_conversation,
+    delete_conversation
 )
 
 urlpatterns = [
@@ -44,5 +46,17 @@ urlpatterns = [
         "conversations/<int:conversation_id>/members/<int:user_id>/",
         remove_conversation_member,
         name="remove_conversation_member"
+    ),
+
+    path(
+        "conversations/<int:conversation_id>/",
+        update_conversation,
+        name="update_conversation"
+    ),
+
+    path(
+        "conversations/<int:conversation_id>/delete/",
+        delete_conversation,
+        name="delete_conversation"
     ),
 ]
