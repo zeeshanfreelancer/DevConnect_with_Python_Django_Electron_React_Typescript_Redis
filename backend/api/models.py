@@ -10,6 +10,14 @@ class Conversation(models.Model):
         related_name="conversations"
     )
 
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_conversations"
+    )
+
     last_message = models.TextField(blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True)

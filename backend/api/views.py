@@ -44,7 +44,9 @@ def conversations(request):
 
         if serializer.is_valid():
 
-            conversation = serializer.save()
+            conversation = serializer.save(
+                created_by=request.user
+            )
 
             # Automatically add the logged-in user
             conversation.members.add(request.user)
@@ -294,4 +296,57 @@ def conversation_members(request, conversation_id):
         "success": True,
         "conversation_id": conversation.id,
         "members": data
+    }, status=status.HTTP_200_OK)
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def remove_conversation_member(request, conversation_id, user_id):
+
+    try:
+        conversation = Conversation.objects.get(
+            id=conversation_id,
+            members=request.user
+        )
+
+    except Conversation.DoesNotExist:
+        return Response(
+            {"error": "Conversation not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Find the user to remove
+    try:
+        user_to_remove = conversation.members.get(
+            id=user_id
+        )
+
+    except User.DoesNotExist:
+        return Response(
+            {"error": "User is not a member of this conversation."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Only creator can remove other members
+    if user_to_remove != request.user:
+
+        if conversation.created_by != request.user:
+            return Response(
+                {"error": "Only the conversation creator can remove other members."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+    # Prevent removing the last member
+    if conversation.members.count() <= 1:
+        return Response(
+            {"error": "The last member cannot leave the conversation."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    conversation.members.remove(user_to_remove)
+
+    return Response({
+        "success": True,
+        "message": f"{user_to_remove.username} removed from conversation.",
+        "conversation_id": conversation.id,
+        "removed_user_id": user_to_remove.id
     }, status=status.HTTP_200_OK)
