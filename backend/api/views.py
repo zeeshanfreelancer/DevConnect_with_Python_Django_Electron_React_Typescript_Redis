@@ -226,9 +226,9 @@ def profile(request):
     }, status=status.HTTP_200_OK)
 
 
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
-def add_conversation_member(request, conversation_id):
+def conversation_members(request, conversation_id):
 
     try:
         conversation = Conversation.objects.get(
@@ -242,37 +242,56 @@ def add_conversation_member(request, conversation_id):
             status=status.HTTP_404_NOT_FOUND
         )
 
-    username = request.data.get("username")
+    if request.method == "POST":
+        username = request.data.get("username")
 
-    if not username:
+        if not username:
+            return Response(
+                {"error": "Username is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if conversation.members.filter(id=user.id).exists():
+            return Response(
+                {"error": "User is already a member."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        conversation.members.add(user)
+
         return Response(
-            {"error": "Username is required."},
-            status=status.HTTP_400_BAD_REQUEST
+            {
+                "success": True,
+                "message": f"{username} added to conversation.",
+                "conversation_id": conversation.id,
+                "member": {"id": user.id, "username": user.username},
+            },
+            status=status.HTTP_200_OK,
         )
 
-    try:
-        user = User.objects.get(username=username)
+    members = conversation.members.all()
 
-    except User.DoesNotExist:
-        return Response(
-            {"error": "User not found."},
-            status=status.HTTP_404_NOT_FOUND
-        )
-
-    if conversation.members.filter(id=user.id).exists():
-        return Response(
-            {"error": "User is already a member."},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    conversation.members.add(user)
+    data = [
+        {
+            "id": member.id,
+            "username": member.username,
+            "email": member.email,
+            "first_name": member.first_name,
+            "last_name": member.last_name,
+        }
+        for member in members
+    ]
 
     return Response({
         "success": True,
-        "message": f"{username} added to conversation.",
         "conversation_id": conversation.id,
-        "member": {
-            "id": user.id,
-            "username": user.username
-        }
+        "members": data
     }, status=status.HTTP_200_OK)

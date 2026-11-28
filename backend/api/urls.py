@@ -7,9 +7,9 @@ from .views import (
     message_detail,
     register,
     login,
-    add_conversation_member,
     profile,
     logout,
+    conversation_members
 )
 
 urlpatterns = [
@@ -35,7 +35,7 @@ urlpatterns = [
 
     path(
         "conversations/<int:conversation_id>/members/",
-        add_conversation_member,
-        name="add_conversation_member"
+        conversation_members,
+        name="conversation_members"
     ),
 ]
